@@ -2,6 +2,11 @@
 
 A REST API for personal calendars, built with Django REST Framework. Users keep their own events, share them with others (view only), and look up Colombian public holidays through an outside API.
 
+**Live:**
+- The calendar app built on it: https://calendar.206.189.176.206.sslip.io
+- Interactive API docs (Swagger): https://calendar.206.189.176.206.sslip.io/api/docs/
+- The app's code: https://github.com/Esteban-Jr/calendar-app
+
 ## Features
 
 - Events with full CRUD, validation and token login
