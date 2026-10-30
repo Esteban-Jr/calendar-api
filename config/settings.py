@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'events',
+    'accounts',
     'drf_spectacular',
 ]
 
@@ -150,7 +151,37 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    # Per-IP limits on the open endpoints (login, sign-up, emailed codes).
+    'DEFAULT_THROTTLE_RATES': {
+        'login': '30/hour',
+        'register': '15/hour',
+        'code_send': '10/hour',
+        'code_check': '30/hour',
+    },
+    # Nginx sits in front and adds the visitor's address; trust that one hop.
+    'NUM_PROXIES': 1,
 }
+
+# Sign-up can be closed with ALLOW_REGISTRATION=0 in the server's .env.
+ALLOW_REGISTRATION = os.environ.get('ALLOW_REGISTRATION', '1') == '1'
+
+# Email: with no EMAIL_HOST set, emails are printed in the console instead of sent.
+# (Django 6.1 configures email through MAILERS, replacing the old EMAIL_* settings.)
+if os.environ.get('EMAIL_HOST'):
+    MAILERS = {
+        'default': {
+            'BACKEND': 'django.core.mail.backends.smtp.EmailBackend',
+            'OPTIONS': {
+                'host': os.environ['EMAIL_HOST'],
+                'port': int(os.environ.get('EMAIL_PORT', '587')),
+                'username': os.environ.get('EMAIL_HOST_USER', ''),
+                'password': os.environ.get('EMAIL_HOST_PASSWORD', ''),
+                'use_tls': os.environ.get('EMAIL_USE_TLS', '1') == '1',
+                'timeout': 10,
+            },
+        },
+    }
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'My Calendar <no-reply@localhost>')
 
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Calendar API',

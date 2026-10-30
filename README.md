@@ -19,6 +19,11 @@ All endpoints except the login and the docs need the header `Authorization: Toke
 | Method | Path | What it does |
 |---|---|---|
 | POST | `/api-auth/` | Log in with `username` and `password`, get a token |
+| POST | `/api/auth/register/` | Start creating an account (`username`, `email`, `password`). Emails a 6-digit code |
+| POST | `/api/auth/verify/` | Confirm the code (`email`, `code`). Creates the account and returns a token |
+| POST | `/api/auth/resend/` | Send a fresh sign-up code (`email`) |
+| POST | `/api/auth/forgot/` | Email a password-reset code (`email`). Same answer whether or not the account exists |
+| POST | `/api/auth/reset/` | Choose a new password (`email`, `code`, `password`). Signs out other devices |
 | GET | `/api/events/` | List your events, plus events shared with you |
 | GET | `/api/events/?start=...&end=...` | Only events that overlap that date range |
 | POST | `/api/events/` | Create an event |
@@ -26,6 +31,7 @@ All endpoints except the login and the docs need the header `Authorization: Toke
 | PUT / PATCH | `/api/events/{id}/` | Replace / change part of an event (owner only) |
 | DELETE | `/api/events/{id}/` | Delete an event (owner only) |
 | GET | `/api/holidays/?year=2026` | Colombian public holidays for a year |
+| GET | `/api/me/` | Who am I: `{"id": 1, "username": "anna"}` |
 | GET | `/api/docs/` | Swagger UI |
 | GET | `/api/schema/` | OpenAPI schema |
 
@@ -40,12 +46,16 @@ All endpoints except the login and the docs need the header `Authorization: Toke
   "start": "2026-10-31T07:30:00-05:00",
   "end": "2026-10-31T10:00:00-05:00",
   "owner": 1,
+  "owner_username": "anna",
   "reminder": 30,
-  "shared_with": [2]
+  "color": "blueberry",
+  "shared_with": ["ben"]
 }
 ```
 
-- `owner` and `id` are set by the server and cannot be sent by the client.
+- `owner`, `owner_username` and `id` are set by the server and cannot be sent by the client.
+- `shared_with` is a list of usernames. Sharing with a username that does not exist gives a 400.
+- `color` is one of `strawberry`, `peach`, `vanilla`, `pistachio`, `mint`, `blueberry` (default), `lavender`, `bubblegum`.
 - `reminder` is minutes before the start, from 0 to 10080 (one week).
 - A time sent without an offset is read as Bogota time.
 
@@ -60,6 +70,7 @@ All endpoints except the login and the docs need the header `Authorization: Toke
 | 401 | No token, or an invalid one |
 | 403 | You can see the event (it was shared with you) but you are not the owner |
 | 404 | The event does not exist, or it is not yours or shared with you |
+| 429 | Too many tries from one address (login, sign-up, emailed codes) |
 | 502 | The holidays service is down or returned an error |
 
 A stranger gets a 404 and not a 403 on purpose, so the API never confirms that someone else's event exists.
@@ -80,10 +91,10 @@ curl -X POST \
 curl -H "Authorization: Token YOUR_TOKEN" \
   "http://127.0.0.1:8000/api/events/?start=2026-11-01T00:00:00&end=2026-11-30T23:59:59"
 
-# 4. Share event 1 with user 2 (view only)
+# 4. Share event 1 with ben (view only)
 curl -X PATCH \
   -H "Authorization: Token YOUR_TOKEN" -H "Content-Type: application/json" \
-  -d '{"shared_with":[2]}' http://127.0.0.1:8000/api/events/1/
+  -d '{"shared_with":["ben"]}' http://127.0.0.1:8000/api/events/1/
 ```
 
 ## Run it locally
@@ -121,6 +132,18 @@ Settings come from environment variables. With none set, the app runs in develop
 | `DEBUG` | `1` for debug mode, `0` for production | `1` |
 | `ALLOWED_HOSTS` | Comma-separated host names | `127.0.0.1,localhost` |
 | `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST` | Use PostgreSQL when `DB_NAME` is set | SQLite |
+| `ALLOW_REGISTRATION` | `0` closes sign-up | `1` |
+| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | SMTP server for the emailed codes. With no `EMAIL_HOST`, emails are printed in the console | console |
+| `DEFAULT_FROM_EMAIL` | The sender address | `My Calendar <no-reply@localhost>` |
+
+## Accounts
+
+- A new account is only created after the emailed code is confirmed, so an abandoned sign-up leaves nothing behind but one row.
+- Codes are 6 digits, last 15 minutes, work once, and die after 5 wrong tries. Only a keyed hash of a code is stored.
+- A new code can be sent once a minute per address. Passwords must pass Django's validators (length, not too common, not all digits).
+- "Forgot password" answers identically for unknown emails, so it cannot be used to find out who has an account.
+- Resetting a password signs out every other device.
+- Sign-up can be switched off with `ALLOW_REGISTRATION=0`.
 
 ## Design notes
 
