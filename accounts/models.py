@@ -28,3 +28,18 @@ class ResetCode(models.Model):
 
     def __str__(self):
         return f'reset code for {self.user.username}'
+
+
+class UsernameChange(models.Model):
+    """Each time someone changes their username. The newest one decides when
+    they can change it again (once every USERNAME_CHANGE_EVERY)."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='username_changes')
+    old_username = models.CharField(max_length=150)
+    new_username = models.CharField(max_length=150)
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-changed_at']
+
+    def __str__(self):
+        return f'{self.old_username} → {self.new_username}'

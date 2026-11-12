@@ -75,7 +75,7 @@ class EventTests(APITestCase):
         self.client.force_authenticate(user=user)
         response = self.client.get('/api/me/')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data, {'id': user.id, 'username': 'anna'})
+        self.assertEqual((response.data['id'], response.data['username']), (user.id, 'anna'))  # more in accounts/tests_me.py
 
     def test_owner_can_share_by_username(self):
         anna = User.objects.create_user('anna', password='pass12345')
