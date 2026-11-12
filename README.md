@@ -12,6 +12,7 @@ A REST API for personal calendars, built with Django REST Framework. Users keep 
 - Events with full CRUD, validation and token login
 - Filter events by date range
 - Friends: send a request by username, the other person accepts or declines
+- Change your username once a week; friends are told "anna is now called annabel"
 - Share an event with your friends: they get an invite to accept or decline, and it only shows in their calendar once they accept. They can read it; only the owner can change or delete it
 - Reminders as push notifications, even when the app is closed (Web Push, sent by a job that runs every minute)
 - Colombian public holidays, fetched from [Nager.Date](https://date.nager.at) and returned in this API's own format
@@ -42,7 +43,8 @@ All endpoints except the login and the docs need the header `Authorization: Toke
 | POST | `/api/events/{id}/decline/` | Decline an invite: it never shows in my calendar. The owner is notified |
 | POST | `/api/events/{id}/invite-again/` | Owner only: send a fresh invite to someone who declined (`username`) |
 | GET | `/api/holidays/?year=2026` | Colombian public holidays for a year |
-| GET | `/api/me/` | Who am I: `{"id": 1, "username": "anna"}` |
+| GET | `/api/me/` | Who am I: `id`, `username`, `email`, and `next_username_change` (when I can change it again, or `null`) |
+| PATCH | `/api/me/` | Change my username (`username`): same rules as signing up, once a week. Friends and pending friend requests are told, unless only the capitals changed |
 | GET | `/api/friends/` | My friends, requests sent to me (`incoming`) and requests I sent (`outgoing`) |
 | POST | `/api/friends/` | Send a friend request (`username`). If they already asked you, you become friends |
 | POST | `/api/friends/{id}/accept/` | Accept a request sent to you |

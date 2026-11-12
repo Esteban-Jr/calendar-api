@@ -145,11 +145,6 @@ class EventViewSet(viewsets.ModelViewSet):
 
 
 @api_view(['GET'])
-def me(request):
-    return Response({'id': request.user.id, 'username': request.user.username})
-
-
-@api_view(['GET'])
 def holidays(request):
     year = request.query_params.get('year')
     if not year:
