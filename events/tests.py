@@ -1,5 +1,6 @@
 from rest_framework.test import APITestCase
 from django.contrib.auth.models import User
+from friends.models import Friendship
 from .models import Event
 
 class EventTests(APITestCase):
@@ -79,6 +80,7 @@ class EventTests(APITestCase):
     def test_owner_can_share_by_username(self):
         anna = User.objects.create_user('anna', password='pass12345')
         ben = User.objects.create_user('ben', password='pass12345')
+        Friendship.objects.create(from_user=anna, to_user=ben, accepted=True)  # sharing needs friends
         event = Event.objects.create(
             title='Plan', start='2026-10-31T09:00:00Z', end='2026-10-31T10:00:00Z', owner=anna,
         )
