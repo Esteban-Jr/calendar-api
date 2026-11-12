@@ -1,0 +1,39 @@
+# Runs the tests on every pull request. After a merge to main, runs them
+# again and, if they pass, deploys to the server (the same `deploy calendar`
+# as by hand). The SSH key in DEPLOY_SSH_KEY can only run that one command.
+name: Test and deploy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch: # a "Run workflow" button on GitHub, to deploy by hand
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python manage.py test
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    concurrency: deploy-calendar-api # one deploy at a time, in order
+    steps:
+      - name: Deploy to the server
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # The server ignores what we ask and runs `deploy calendar` (the key only allows that).
+          ssh -i ~/.ssh/deploy esteban@206.189.176.206
