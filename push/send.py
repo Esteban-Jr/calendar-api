@@ -11,6 +11,8 @@ def send_to_user(user, message):
     """Push `message` ({title, body, tag, url}) to every device of `user`.
     Returns how many devices accepted it. Devices the push service says are
     gone (the app was removed, or notifications were turned off) are forgotten."""
+    if not settings.VAPID_PRIVATE_KEY:
+        return 0  # push isn't set up on this server
     sent = 0
     for subscription in list(user.push_subscriptions.all()):
         try:

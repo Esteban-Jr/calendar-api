@@ -1,4 +1,8 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets, permissions
+from rest_framework.decorators import action
+from notifications.models import Notification
+from notifications.notify import notify
 from .models import Event
 from .serializers import EventSerializer
 from django.db.models import Q
@@ -25,6 +29,25 @@ class EventViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
+
+    def perform_destroy(self, event):
+        # Tell everyone it was shared with (the event is gone after this).
+        people = list(event.shared_with.all())
+        event.delete()
+        for person in people:
+            notify(person, Notification.EVENT_DELETED, self.request.user, event)
+
+    @extend_schema(request=None, responses={204: None})
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def leave(self, request, pk=None):
+        """Remove an event someone shared with me from my calendar. Only I am
+        taken off it; the owner keeps the event and is told."""
+        event = self.get_object()  # 404 unless it's mine or shared with me
+        if event.owner == request.user:
+            return Response({'detail': 'This is your own event. Delete it instead.'}, status=400)
+        event.shared_with.remove(request.user)
+        notify(event.owner, Notification.SHARE_REMOVED, request.user, event)
+        return Response(status=204)
 
 @api_view(['GET'])
 def me(request):

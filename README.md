@@ -36,7 +36,7 @@ All endpoints except the login and the docs need the header `Authorization: Toke
 | POST | `/api/events/` | Create an event |
 | GET | `/api/events/{id}/` | Get one event |
 | PUT / PATCH | `/api/events/{id}/` | Replace / change part of an event (owner only) |
-| DELETE | `/api/events/{id}/` | Delete an event (owner only) |
+| DELETE | `/api/events/{id}/` | Delete an event (owner only). Everyone it was shared with is notified |
 | GET | `/api/holidays/?year=2026` | Colombian public holidays for a year |
 | GET | `/api/me/` | Who am I: `{"id": 1, "username": "anna"}` |
 | GET | `/api/friends/` | My friends, requests sent to me (`incoming`) and requests I sent (`outgoing`) |
@@ -46,6 +46,9 @@ All endpoints except the login and the docs need the header `Authorization: Toke
 | GET | `/api/push/key/` | The public key a browser needs to turn on push (503 if push isn't set up) |
 | POST | `/api/push/subscribe/` | Save this device's push subscription (`endpoint`, `keys`) |
 | POST | `/api/push/unsubscribe/` | Stop pushing to a device (`endpoint`) |
+| POST | `/api/events/{id}/leave/` | Remove an event someone shared with you from your calendar. The owner is notified |
+| GET | `/api/notifications/` | My latest notifications (`message`, `read`...) and the `unread` count |
+| POST | `/api/notifications/read/` | Mark all my notifications as read |
 | GET | `/api/docs/` | Swagger UI |
 | GET | `/api/schema/` | OpenAPI schema |
 
@@ -165,6 +168,13 @@ Settings come from environment variables. With none set, the app runs in develop
 - "Forgot password" answers identically for unknown emails, so it cannot be used to find out who has an account.
 - Resetting a password signs out every other device.
 - Sign-up can be switched off with `ALLOW_REGISTRATION=0`.
+
+## Notifications
+
+- When someone removes an event you shared with them, you get a notification ("ben removed “Dinner” from their calendar"). When you delete an event, everyone it was shared with gets one ("anna deleted “Dinner”").
+- They're saved (the app shows them in a list) and also pushed to the person's devices. The event's title and time are copied into the notification, since the event itself may be gone.
+- Removing yourself only takes you off that event: the owner keeps it, and can share it with you again.
+- A push problem never stops the action itself.
 
 ## Push reminders
 

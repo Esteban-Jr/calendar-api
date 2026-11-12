@@ -27,6 +27,7 @@ urlpatterns = [
     path('api/', include('events.urls')),
     path('api/', include('friends.urls')),
     path('api/', include('push.urls')),
+    path('api/', include('notifications.urls')),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='docs'),
     path('', RedirectView.as_view(url='/api/docs/')),
