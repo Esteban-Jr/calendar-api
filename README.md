@@ -11,7 +11,8 @@ A REST API for personal calendars, built with Django REST Framework. Users keep 
 
 - Events with full CRUD, validation and token login
 - Filter events by date range
-- Share an event with other users: they can read it, only the owner can change or delete it
+- Friends: send a request by username, the other person accepts or declines
+- Share an event with your friends: they can read it, only the owner can change or delete it
 - Colombian public holidays, fetched from [Nager.Date](https://date.nager.at) and returned in this API's own format
 - Time zone aware: times are stored in UTC and shown in `America/Bogota`
 - Interactive API docs (Swagger UI) generated from the code
@@ -37,6 +38,10 @@ All endpoints except the login and the docs need the header `Authorization: Toke
 | DELETE | `/api/events/{id}/` | Delete an event (owner only) |
 | GET | `/api/holidays/?year=2026` | Colombian public holidays for a year |
 | GET | `/api/me/` | Who am I: `{"id": 1, "username": "anna"}` |
+| GET | `/api/friends/` | My friends, requests sent to me (`incoming`) and requests I sent (`outgoing`) |
+| POST | `/api/friends/` | Send a friend request (`username`). If they already asked you, you become friends |
+| POST | `/api/friends/{id}/accept/` | Accept a request sent to you |
+| DELETE | `/api/friends/{id}/` | Decline, cancel or unfriend. Unfriending also stops sharing between you, both ways |
 | GET | `/api/docs/` | Swagger UI |
 | GET | `/api/schema/` | OpenAPI schema |
 
@@ -59,7 +64,7 @@ All endpoints except the login and the docs need the header `Authorization: Toke
 ```
 
 - `owner`, `owner_username` and `id` are set by the server and cannot be sent by the client.
-- `shared_with` is a list of usernames. Sharing with a username that does not exist gives a 400.
+- `shared_with` is a list of usernames, and they must be your friends. Anyone else (or a username that does not exist) gives a 400.
 - `color` is one of `strawberry`, `peach`, `vanilla`, `pistachio`, `mint`, `blueberry` (default), `lavender`, `bubblegum`.
 - `reminder` is minutes before the start, from 0 to 10080 (one week).
 - A time sent without an offset is read as Bogota time.
@@ -96,7 +101,12 @@ curl -X POST \
 curl -H "Authorization: Token YOUR_TOKEN" \
   "http://127.0.0.1:8000/api/events/?start=2026-11-01T00:00:00&end=2026-11-30T23:59:59"
 
-# 4. Share event 1 with ben (view only)
+# 4. Ask ben to be friends (ben accepts with POST /api/friends/{id}/accept/)
+curl -X POST \
+  -H "Authorization: Token YOUR_TOKEN" -H "Content-Type: application/json" \
+  -d '{"username":"ben"}' http://127.0.0.1:8000/api/friends/
+
+# 5. Share event 1 with ben (view only)
 curl -X PATCH \
   -H "Authorization: Token YOUR_TOKEN" -H "Content-Type: application/json" \
   -d '{"shared_with":["ben"]}' http://127.0.0.1:8000/api/events/1/
@@ -125,7 +135,7 @@ Then open http://127.0.0.1:8000/api/docs/.
 python manage.py test
 ```
 
-They cover: no token gives 401, `end` before `start` gives 400, a stranger gets 404, and a shared user cannot delete an event (403).
+They cover: no token gives 401, `end` before `start` gives 400, a stranger gets 404, a shared user cannot delete an event (403), the sign-up and password-reset codes, and friends (requests, accepting, only sharing with friends, unfriending removes shares).
 
 ## Configuration
 
@@ -153,6 +163,7 @@ Settings come from environment variables. With none set, the app runs in develop
 ## Design notes
 
 - **Permissions:** the queryset only contains events you own or that were shared with you, and a custom `IsOwnerOrReadOnly` permission blocks writes from anyone who is not the owner.
+- **Friends:** one row per pair (`from_user` → `to_user`, `accepted`), with database rules against duplicates and against friending yourself. Sending requests is rate-limited (60 an hour) so usernames can't be guessed in bulk.
 - **Validation:** the serializer checks that `end` is after `start`, and on a `PATCH` it falls back to the saved values for any date that was not sent.
 - **Integration:** the holidays endpoint validates the year before using it, times out after 5 seconds, and turns any failure of the outside service into a 502, since that is not the client's fault.
 

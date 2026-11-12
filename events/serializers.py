@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
+from friends.models import friends_of
 from .models import Event
 
 class EventSerializer(serializers.ModelSerializer):
@@ -15,6 +16,17 @@ class EventSerializer(serializers.ModelSerializer):
     owner_username = serializers.ReadOnlyField(source='owner.username')
 
     reminder = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=10080)
+
+    # Only friends can be shared with. Everyone already on the list stays
+    # allowed, so editing an old event never fails because of it.
+    def validate_shared_with(self, users):
+        me = self.context['request'].user
+        already = set(self.instance.shared_with.all()) if self.instance else set()
+        friends = set(friends_of(me))
+        strangers = [u.username for u in users if u not in friends and u not in already]
+        if strangers:
+            raise serializers.ValidationError(f"You can only share with friends: {', '.join(strangers)}.")
+        return users
 
     def validate(self, data):
         start = data.get('start', self.instance.start if self.instance else None)

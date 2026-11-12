@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'events',
     'accounts',
+    'friends',
     'drf_spectacular',
 ]
 
@@ -157,6 +158,7 @@ REST_FRAMEWORK = {
         'register': '15/hour',
         'code_send': '10/hour',
         'code_check': '30/hour',
+        'friend_request': '60/hour',
     },
     # Nginx sits in front and adds the visitor's address; trust that one hop.
     'NUM_PROXIES': 1,
