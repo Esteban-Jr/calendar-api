@@ -23,3 +23,6 @@ class Event(models.Model):
     reminder = models.PositiveIntegerField(null=True, blank=True)
     color = models.CharField(max_length=20, choices=EVENT_COLORS, default='blueberry')
     shared_with = models.ManyToManyField(User, related_name='shared_events', blank=True)
+    # The start time a push reminder was last sent for (see push/). If the
+    # event is moved, start no longer matches and the reminder goes out again.
+    reminder_sent_for = models.DateTimeField(null=True, blank=True, editable=False)

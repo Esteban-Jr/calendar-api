@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'events',
     'accounts',
     'friends',
+    'push',
     'drf_spectacular',
 ]
 
@@ -163,6 +164,12 @@ REST_FRAMEWORK = {
     # Nginx sits in front and adds the visitor's address; trust that one hop.
     'NUM_PROXIES': 1,
 }
+
+# Push notifications (reminders while the app is closed). Make the keys once
+# with `manage.py make_push_keys`; with no keys, push is simply off.
+VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '')
+VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
+VAPID_SUBJECT = os.environ.get('VAPID_SUBJECT', 'mailto:no-reply@localhost')
 
 # Sign-up can be closed with ALLOW_REGISTRATION=0 in the server's .env.
 ALLOW_REGISTRATION = os.environ.get('ALLOW_REGISTRATION', '1') == '1'

@@ -13,6 +13,7 @@ A REST API for personal calendars, built with Django REST Framework. Users keep 
 - Filter events by date range
 - Friends: send a request by username, the other person accepts or declines
 - Share an event with your friends: they can read it, only the owner can change or delete it
+- Reminders as push notifications, even when the app is closed (Web Push, sent by a job that runs every minute)
 - Colombian public holidays, fetched from [Nager.Date](https://date.nager.at) and returned in this API's own format
 - Time zone aware: times are stored in UTC and shown in `America/Bogota`
 - Interactive API docs (Swagger UI) generated from the code
@@ -42,6 +43,9 @@ All endpoints except the login and the docs need the header `Authorization: Toke
 | POST | `/api/friends/` | Send a friend request (`username`). If they already asked you, you become friends |
 | POST | `/api/friends/{id}/accept/` | Accept a request sent to you |
 | DELETE | `/api/friends/{id}/` | Decline, cancel or unfriend. Unfriending also stops sharing between you, both ways |
+| GET | `/api/push/key/` | The public key a browser needs to turn on push (503 if push isn't set up) |
+| POST | `/api/push/subscribe/` | Save this device's push subscription (`endpoint`, `keys`) |
+| POST | `/api/push/unsubscribe/` | Stop pushing to a device (`endpoint`) |
 | GET | `/api/docs/` | Swagger UI |
 | GET | `/api/schema/` | OpenAPI schema |
 
@@ -150,6 +154,8 @@ Settings come from environment variables. With none set, the app runs in develop
 | `ALLOW_REGISTRATION` | `0` closes sign-up | `1` |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | SMTP server for the emailed codes. With no `EMAIL_HOST`, emails are printed in the console | console |
 | `DEFAULT_FROM_EMAIL` | The sender address | `My Calendar <no-reply@localhost>` |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Push keys, made with `python manage.py make_push_keys`. Without them push is off | none |
+| `VAPID_SUBJECT` | Contact for the push services, e.g. `mailto:me@example.com` | `mailto:no-reply@localhost` |
 
 ## Accounts
 
@@ -159,6 +165,14 @@ Settings come from environment variables. With none set, the app runs in develop
 - "Forgot password" answers identically for unknown emails, so it cannot be used to find out who has an account.
 - Resetting a password signs out every other device.
 - Sign-up can be switched off with `ALLOW_REGISTRATION=0`.
+
+## Push reminders
+
+- When someone turns on notifications, their browser subscribes with the push service (Apple, Google or Mozilla) and the app saves the subscription here.
+- `python manage.py send_reminders` sends every reminder that is due, to the event owner's devices. On the server a systemd timer runs it every minute (`scripts/setup-push.sh` installs the timer and the keys).
+- Each reminder is sent once per start time: `Event.reminder_sent_for` remembers it, so moving an event reminds again.
+- The message uses the same wording and the same notification tag as the web app's own reminders, so a phone with the app open shows one notification, not two.
+- Devices the push service reports as gone (404/410) are deleted. Only real push service addresses are accepted, so the server can't be made to send requests anywhere else.
 
 ## Design notes
 
