@@ -38,6 +38,7 @@ class MeTests(APITestCase):
         data = self.client.get('/api/me/').data
         self.assertEqual(data, {
             'id': self.anna.id, 'username': 'anna', 'email': 'anna@example.com', 'next_username_change': None,
+            'theme': 'default',
         })
 
     def test_needs_a_token(self, webpush):
@@ -145,3 +146,29 @@ class MeTests(APITestCase):
         self.client.force_authenticate(user=self.ben)
         messages = [n['message'] for n in self.client.get('/api/notifications/').data['notifications']]
         self.assertEqual(messages, ['annabel is now called annie', 'anna is now called annabel'])
+
+    # ---------- Theme (#30) ----------
+
+    def test_change_my_theme(self, webpush):
+        response = self.client.patch('/api/me/', {'theme': 'faith'}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['theme'], 'faith')
+        self.assertEqual(self.client.get('/api/me/').data['theme'], 'faith')  # saved for every device
+
+    def test_theme_any_time_and_no_notifications(self, webpush):
+        Friendship.objects.create(from_user=self.anna, to_user=self.ben, accepted=True)
+        for theme in ['space', 'football', 'default']:
+            self.assertEqual(self.client.patch('/api/me/', {'theme': theme}, format='json').status_code, 200)
+        self.assertFalse(Notification.objects.exists())
+        self.assertFalse(UsernameChange.objects.exists())  # doesn't use up the username change
+
+    def test_unknown_theme_is_refused(self, webpush):
+        response = self.client.patch('/api/me/', {'theme': 'neon'}, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('theme', response.data)
+
+    def test_themes_are_per_person(self, webpush):
+        self.client.patch('/api/me/', {'theme': 'space'}, format='json')
+        self.client.force_authenticate(user=self.ben)
+        self.assertEqual(self.client.get('/api/me/').data['theme'], 'default')
+

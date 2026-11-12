@@ -19,7 +19,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from .codes import code_matches, hash_code, new_code, send_code_email, seconds_until_resend
-from .models import PendingSignup, ResetCode, UsernameChange
+from .models import PendingSignup, Preferences, ResetCode, UsernameChange, preferences_of
 from .throttles import CodeCheckThrottle, CodeSendThrottle, LoginThrottle, RegisterThrottle
 
 logger = logging.getLogger(__name__)
@@ -237,6 +237,8 @@ class MeSerializer(serializers.Serializer):
     email = serializers.EmailField(read_only=True)
     # When I can change my username again (null: I can now).
     next_username_change = serializers.DateTimeField(read_only=True, allow_null=True)
+    # The calendar's look, on every device: default, faith, football or space.
+    theme = serializers.ChoiceField(choices=Preferences.THEMES, required=False)
 
     def validate_username(self, value):
         me = self.instance
@@ -254,6 +256,7 @@ def me_data(user):
     return {
         'id': user.id, 'username': user.username, 'email': user.email,
         'next_username_change': next_username_change(user),
+        'theme': preferences_of(user).theme,
     }
 
 
@@ -262,16 +265,20 @@ def me_data(user):
 def me(request):
     """GET: who I am. PATCH {"username"}: change my username (once a week).
     Friends and people with a pending friend request are told, unless only
-    the capitals changed. I stay signed in; I log in with the new name next time."""
+    the capitals changed. I stay signed in; I log in with the new name next time.
+    PATCH {"theme"}: change the calendar's look (any time)."""
     user = request.user
     if request.method == 'GET':
         return Response(MeSerializer(me_data(user)).data)
 
     serializer = MeSerializer(user, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
+    theme = serializer.validated_data.get('theme')
+    if theme is not None:
+        Preferences.objects.update_or_create(user=user, defaults={'theme': theme})
     new = serializer.validated_data.get('username')
     if new is None:
-        return Response(MeSerializer(me_data(user)).data)  # nothing to change
+        return Response(MeSerializer(me_data(user)).data)  # no new username
 
     old = user.username
     try:
