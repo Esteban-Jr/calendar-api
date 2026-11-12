@@ -138,6 +138,9 @@ class EventViewSet(viewsets.ModelViewSet):
         share.answered = None
         share.save(update_fields=['status', 'answered'])
         notify(share.user, Notification.INVITED, request.user, event)
+        # The event's shares were loaded before this change: load them again
+        # so the answer shows the new status.
+        event._prefetched_objects_cache = {}
         return Response(self.get_serializer(event).data)
 
 

@@ -185,6 +185,7 @@ class InviteTests(APITestCase):
         self.as_user(self.anna)
         response = self.client.post(f'/api/events/{event_id}/invite-again/', {'username': 'ben'}, format='json')
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['shares'], [{'username': 'ben', 'status': 'waiting'}])  # the answer is up to date
         self.assertEqual(self.status_of(event_id, self.ben), Share.WAITING)
         self.assertEqual(self.kinds_for(self.ben), [Notification.INVITED, Notification.INVITED])
         self.assertEqual(self.my_calendar(self.ben), [])  # still has to accept
