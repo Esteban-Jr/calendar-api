@@ -144,6 +144,10 @@ python manage.py test
 
 They cover: no token gives 401, `end` before `start` gives 400, a stranger gets 404, a shared user cannot delete an event (403), the sign-up and password-reset codes, and friends (requests, accepting, only sharing with friends, unfriending removes shares).
 
+## Continuous integration and deployment
+
+GitHub Actions (`.github/workflows/deploy.yml`) runs the tests on every pull request. After a merge to `main` it runs them again and, if they pass, deploys to the server. The SSH key it uses (the `DEPLOY_SSH_KEY` secret) can only run the server's `deploy calendar` command, which pulls the code, installs packages, runs migrations and restarts the API. It can't open a shell.
+
 ## Configuration
 
 Settings come from environment variables. With none set, the app runs in development mode with SQLite.
