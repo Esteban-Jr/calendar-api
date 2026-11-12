@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'accounts',
     'friends',
     'push',
+    'notifications',
     'drf_spectacular',
 ]
 
