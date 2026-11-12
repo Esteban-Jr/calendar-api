@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
-from events.models import Event
+from events.models import Event, Share
 from friends.models import Friendship
 from push.models import PushSubscription
 from .models import Notification
@@ -22,7 +22,8 @@ class NotificationTests(APITestCase):
         self.dinner = Event.objects.create(
             title='Dinner', start='2026-11-20T19:00:00Z', end='2026-11-20T21:00:00Z', owner=self.anna,
         )
-        self.dinner.shared_with.add(self.ben, self.cleo)
+        # Both have already accepted (invites themselves are tested in events/tests_invites.py).
+        self.dinner.shared_with.add(self.ben, self.cleo, through_defaults={'status': Share.ACCEPTED})
 
     def as_user(self, user):
         self.client.force_authenticate(user=user)
