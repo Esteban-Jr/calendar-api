@@ -3,6 +3,8 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+from events.models import Share
+
 from .serializers import NotificationListSerializer, NotificationSerializer
 
 LATEST = 50
@@ -13,9 +15,10 @@ LATEST = 50
 def notification_list(request):
     """My latest notifications, newest first, and how many are unread."""
     mine = request.user.notifications.select_related('actor')
+    my_answers = dict(Share.objects.filter(user=request.user).values_list('event_id', 'status'))
     return Response({
         'unread': mine.filter(read=False).count(),
-        'notifications': NotificationSerializer(mine[:LATEST], many=True).data,
+        'notifications': NotificationSerializer(mine[:LATEST], many=True, context={'my_answers': my_answers}).data,
     })
 
 

@@ -12,7 +12,7 @@ A REST API for personal calendars, built with Django REST Framework. Users keep 
 - Events with full CRUD, validation and token login
 - Filter events by date range
 - Friends: send a request by username, the other person accepts or declines
-- Share an event with your friends: they can read it, only the owner can change or delete it
+- Share an event with your friends: they get an invite to accept or decline, and it only shows in their calendar once they accept. They can read it; only the owner can change or delete it
 - Reminders as push notifications, even when the app is closed (Web Push, sent by a job that runs every minute)
 - Colombian public holidays, fetched from [Nager.Date](https://date.nager.at) and returned in this API's own format
 - Time zone aware: times are stored in UTC and shown in `America/Bogota`
@@ -31,12 +31,16 @@ All endpoints except the login and the docs need the header `Authorization: Toke
 | POST | `/api/auth/resend/` | Send a fresh sign-up code (`email`) |
 | POST | `/api/auth/forgot/` | Email a password-reset code (`email`). Same answer whether or not the account exists |
 | POST | `/api/auth/reset/` | Choose a new password (`email`, `code`, `password`). Signs out other devices |
-| GET | `/api/events/` | List your events, plus events shared with you |
+| GET | `/api/events/` | List your events, plus shared events you've accepted |
 | GET | `/api/events/?start=...&end=...` | Only events that overlap that date range |
 | POST | `/api/events/` | Create an event |
-| GET | `/api/events/{id}/` | Get one event |
-| PUT / PATCH | `/api/events/{id}/` | Replace / change part of an event (owner only) |
-| DELETE | `/api/events/{id}/` | Delete an event (owner only). Everyone it was shared with is notified |
+| GET | `/api/events/{id}/` | Get one event. `shares` lists each person it's shared with and their answer (`waiting`, `accepted`, `declined`); `my_status` is yours |
+| PUT / PATCH | `/api/events/{id}/` | Replace / change part of an event (owner only). People added to `shared_with` get an invite; people removed before answering are told it was cancelled |
+| DELETE | `/api/events/{id}/` | Delete an event (owner only). People who accepted are told it was deleted, people who hadn't answered that it was cancelled |
+| GET | `/api/events/invites/` | Events shared with me that I haven't answered yet, soonest first |
+| POST | `/api/events/{id}/accept/` | Accept an invite: the event goes into my calendar. The owner is notified |
+| POST | `/api/events/{id}/decline/` | Decline an invite: it never shows in my calendar. The owner is notified |
+| POST | `/api/events/{id}/invite-again/` | Owner only: send a fresh invite to someone who declined (`username`) |
 | GET | `/api/holidays/?year=2026` | Colombian public holidays for a year |
 | GET | `/api/me/` | Who am I: `{"id": 1, "username": "anna"}` |
 | GET | `/api/friends/` | My friends, requests sent to me (`incoming`) and requests I sent (`outgoing`) |
@@ -46,8 +50,8 @@ All endpoints except the login and the docs need the header `Authorization: Toke
 | GET | `/api/push/key/` | The public key a browser needs to turn on push (503 if push isn't set up) |
 | POST | `/api/push/subscribe/` | Save this device's push subscription (`endpoint`, `keys`) |
 | POST | `/api/push/unsubscribe/` | Stop pushing to a device (`endpoint`) |
-| POST | `/api/events/{id}/leave/` | Remove an event someone shared with you from your calendar. The owner is notified |
-| GET | `/api/notifications/` | My latest notifications (`message`, `read`...) and the `unread` count |
+| POST | `/api/events/{id}/leave/` | Remove a shared event you accepted from your calendar. The owner is notified |
+| GET | `/api/notifications/` | My latest notifications (`message`, `read`...) and the `unread` count. Invites have an `event` id and `invite_status` (`waiting`, `accepted`, `declined` or `cancelled`) |
 | POST | `/api/notifications/read/` | Mark all my notifications as read |
 | GET | `/api/docs/` | Swagger UI |
 | GET | `/api/schema/` | OpenAPI schema |
@@ -113,7 +117,7 @@ curl -X POST \
   -H "Authorization: Token YOUR_TOKEN" -H "Content-Type: application/json" \
   -d '{"username":"ben"}' http://127.0.0.1:8000/api/friends/
 
-# 5. Share event 1 with ben (view only)
+# 5. Invite ben to event 1 (he accepts with POST /api/events/1/accept/)
 curl -X PATCH \
   -H "Authorization: Token YOUR_TOKEN" -H "Content-Type: application/json" \
   -d '{"shared_with":["ben"]}' http://127.0.0.1:8000/api/events/1/

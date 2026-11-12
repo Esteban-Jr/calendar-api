@@ -13,6 +13,7 @@ def notify(user, kind, actor, event):
     problem never stops the action that caused it."""
     notification = Notification.objects.create(
         user=user, kind=kind, actor=actor, event_title=event.title, event_start=event.start,
+        event=event if event.pk else None,  # a deleted event has no id any more
     )
     when = timezone.localtime(event.start).strftime('%a %d %b, %I:%M %p').replace(' 0', ' ')
     try:
