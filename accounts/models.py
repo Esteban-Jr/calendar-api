@@ -43,3 +43,20 @@ class UsernameChange(models.Model):
 
     def __str__(self):
         return f'{self.old_username} → {self.new_username}'
+
+
+class Preferences(models.Model):
+    """Per-person settings that follow them to every device."""
+    THEMES = [('default', 'Default'), ('faith', 'Faith'), ('football', 'Football'), ('space', 'Space')]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='preferences')
+    theme = models.CharField(max_length=20, choices=THEMES, default='default')
+
+    def __str__(self):
+        return f'{self.user.username}: {self.theme}'
+
+
+def preferences_of(user):
+    """The person's Preferences, made with the defaults the first time."""
+    preferences, _ = Preferences.objects.get_or_create(user=user)
+    return preferences
