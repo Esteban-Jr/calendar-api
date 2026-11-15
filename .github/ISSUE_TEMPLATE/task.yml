@@ -1,0 +1,67 @@
+name: "🧰 Task"
+description: Chore, refactor, tech debt, security, testing or docs. Work users don't see directly.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Title:** plain English and specific, e.g. "Production settings fall back to unsafe defaults".
+        Don't add the `PL/BE12` prefix here. That goes on the branch and the PR.
+
+  - type: dropdown
+    id: squad
+    attributes:
+      label: Squad
+      options:
+        - "🗓️ Core (CO): events, views, reminders, holidays, UI"
+        - "👥 Social (SO): friends, sharing, invites, notifications"
+        - "🛡️ Platform (PL): accounts, security, tests, CI/CD, performance"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      options:
+        - chore
+        - refactor
+        - tech-debt
+        - security
+        - testing
+        - documentation
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What goes wrong, or gets harder, if we don't do this?
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Done when
+      description: A checklist. Each item clearly true or false.
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes

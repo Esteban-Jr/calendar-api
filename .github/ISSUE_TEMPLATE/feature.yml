@@ -1,0 +1,63 @@
+name: "✨ Feature"
+description: Something new a user can do
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Title:** plain English and specific, e.g. "Dark mode that follows the phone's setting".
+        Don't add the `CO/FE12` prefix here. That goes on the branch and the PR.
+
+  - type: dropdown
+    id: squad
+    attributes:
+      label: Squad
+      options:
+        - "🗓️ Core (CO): events, views, reminders, holidays, UI"
+        - "👥 Social (SO): friends, sharing, invites, notifications"
+        - "🛡️ Platform (PL): accounts, security, tests, CI/CD, performance"
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: Who needs this, and why. Write it as a user story.
+      placeholder: As a … I want … so that …
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: |
+        A checklist. Each item must be clearly true or false, so QA can test it.
+        Include the unhappy paths: bad input, no permission, offline, phone width.
+      value: |
+        - [ ]
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: What NOT to do in this ticket, so the PR stays small.
+      placeholder: "- Manual on/off switch (separate ticket)"
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Linked BE/FE issue, and which one merges first.
+      placeholder: "Needs calendar-api#12 merged first."
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes / design
+      description: Screenshots, links, mockups, hints.
