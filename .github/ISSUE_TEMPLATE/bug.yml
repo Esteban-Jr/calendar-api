@@ -1,0 +1,80 @@
+name: "🐛 Bug"
+description: Something is broken or behaves wrongly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Title:** say what's broken, e.g. "Bad dates in the event list crash the API".
+        Don't add the `CO/BE12` prefix here. That goes on the branch and the PR.
+
+  - type: dropdown
+    id: squad
+    attributes:
+      label: Squad
+      options:
+        - "🗓️ Core (CO): events, views, reminders, holidays, UI"
+        - "👥 Social (SO): friends, sharing, invites, notifications"
+        - "🛡️ Platform (PL): accounts, security, tests, CI/CD, performance"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw. Paste the error, status code or log line if there is one.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: Device, browser, or API endpoint.
+      placeholder: "iPhone 15 / Safari, or GET /api/events/"
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - "🔴 High: crash, data loss, security, or blocks users"
+        - "🟠 Medium: wrong behaviour, but there's a workaround"
+        - "🟢 Low: cosmetic or rare"
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Done when
+      description: A checklist QA can test. Each item clearly true or false.
+      value: |
+        - [ ]
+        - [ ] A test covers this bug so it can't come back
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots / logs

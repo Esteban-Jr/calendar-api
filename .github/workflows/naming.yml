@@ -1,0 +1,61 @@
+# Checks that the branch, PR title and every commit follow the naming pattern:
+#   <SQUAD>/<REPO><issue#>/<description>     e.g. CO/BE12/validate-event-dates
+# SQUAD: CO, SO, PL · REPO: BE (calendar-api) or FE (calendar-app). See CONTRIBUTING.md.
+name: Naming
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  naming:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch, title and commits
+        env:
+          # Passed through env, never pasted into the script, so a title can't run commands.
+          BRANCH: ${{ github.head_ref }}
+          TITLE: ${{ github.event.pull_request.title }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          PR: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          case "$REPO_NAME" in
+            calendar-api) CODE=BE ;;
+            calendar-app) CODE=FE ;;
+            *) echo "Unknown repo $REPO_NAME"; exit 1 ;;
+          esac
+          PREFIX="^(CO|SO|PL)/${CODE}[0-9]+/"
+          errors=0
+
+          if [[ ! "$BRANCH" =~ ${PREFIX}[a-z0-9-]+$ ]]; then
+            echo "::error::Branch '$BRANCH' should look like CO/${CODE}12/short-description (lowercase, hyphens)."
+            errors=1
+          fi
+
+          if [[ ! "$TITLE" =~ ${PREFIX}.+ ]]; then
+            echo "::error::PR title '$TITLE' should look like CO/${CODE}12/Descriptive title."
+            errors=1
+          fi
+
+          # The first line of every commit in the PR. Merge commits from updating the branch are allowed.
+          while IFS= read -r subject; do
+            [[ "$subject" =~ ^Merge\  ]] && continue
+            if [[ ! "$subject" =~ ${PREFIX}.+ ]]; then
+              echo "::error::Commit '$subject' should look like CO/${CODE}12/what changed."
+              errors=1
+            fi
+          done < <(gh api "repos/$GH_REPO/pulls/$PR/commits" --paginate --jq '.[].commit.message | split("\n")[0]')
+
+          if [ "$errors" = 1 ]; then
+            echo
+            echo "Pattern: <SQUAD>/<REPO><issue#>/<description>. SQUAD is CO, SO or PL; REPO in this repo is ${CODE}."
+            echo "See CONTRIBUTING.md, section 2. To fix commit messages: git rebase -i, then reword."
+            exit 1
+          fi
+          echo "Branch, title and commits all follow the naming pattern."
