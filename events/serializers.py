@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 from friends.models import friends_of
-from .models import Event, Share
+from .models import Event, Share, Tag
 
 
 class ShareSerializer(serializers.ModelSerializer):
@@ -13,12 +13,20 @@ class ShareSerializer(serializers.ModelSerializer):
         fields = ['username', 'status']
 
 
+class TagNamesField(serializers.ListField):
+    """An event's tags as a list of names: reads the Tag rows, takes names."""
+    child = serializers.CharField(max_length=30, trim_whitespace=True)
+
+    def to_representation(self, tags):
+        return [tag.name for tag in tags.all()]
+
+
 class EventSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
         fields = [
             'id', 'title', 'description', 'location', 'start', 'end', 'owner', 'owner_username', 'reminder', 'color',
-            'shared_with', 'shares', 'my_status',
+            'shared_with', 'shares', 'my_status', 'tags',
         ]
         read_only_fields = ['id', 'owner']
     
@@ -35,6 +43,11 @@ class EventSerializer(serializers.ModelSerializer):
 
     reminder = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=10080)
 
+    # The owner's own labels, as names A-Z. Friends an event is shared with
+    # see an empty list (tags are private). Sending `tags` replaces them all;
+    # leaving it out of a PATCH keeps them.
+    tags = TagNamesField(required=False, max_length=20)
+
     # Only friends can be shared with. Everyone already on the list stays
     # allowed, so editing an old event never fails because of it.
     def validate_shared_with(self, users):
@@ -45,6 +58,33 @@ class EventSerializer(serializers.ModelSerializer):
         if strangers:
             raise serializers.ValidationError(f"You can only share with friends: {', '.join(strangers)}.")
         return users
+
+    def validate_tags(self, names):
+        # Tidy: lowercase, and the same tag only once ("Work" and "work" are one).
+        return sorted({name.lower() for name in names})
+
+    def to_representation(self, event):
+        data = super().to_representation(event)
+        me = self.context['request'].user
+        if event.owner_id != me.id:
+            data['tags'] = []
+        return data
+
+    def _save_tags(self, event, names):
+        if names is not None:
+            event.tags.set([Tag.objects.get_or_create(owner=event.owner, name=name)[0] for name in names])
+
+    def create(self, validated_data):
+        names = validated_data.pop('tags', None)
+        event = super().create(validated_data)
+        self._save_tags(event, names)
+        return event
+
+    def update(self, event, validated_data):
+        names = validated_data.pop('tags', None)
+        event = super().update(event, validated_data)
+        self._save_tags(event, names)
+        return event
 
     def get_my_status(self, event) -> str | None:
         me = self.context['request'].user

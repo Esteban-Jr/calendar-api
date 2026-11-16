@@ -44,7 +44,7 @@ class EventViewSet(viewsets.ModelViewSet):
             Event.objects.filter(Q(owner=me) | Q(shares__user=me, shares__status__in=answers))
             .distinct()
             .select_related('owner')
-            .prefetch_related('shares__user')
+            .prefetch_related('shares__user', 'tags')
         )
         start = _date_param(self.request, 'start')
         end = _date_param(self.request, 'end')
