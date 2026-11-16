@@ -11,7 +11,7 @@ A REST API for personal calendars, built with Django REST Framework. Users keep 
 
 - Events with full CRUD, validation and token login
 - Filter events by date range
-- Tag your own events (`work`, `football`…) and list your tags
+- Tag your own events (`work`, `football`…), list your tags, and filter by them
 - Friends: send a request by username, the other person accepts or declines
 - Change your username once a week; friends are told "anna is now called annabel"
 - Share an event with your friends: they get an invite to accept or decline, and it only shows in their calendar once they accept. They can read it; only the owner can change or delete it
@@ -35,6 +35,7 @@ All endpoints except the login and the docs need the header `Authorization: Toke
 | POST | `/api/auth/reset/` | Choose a new password (`email`, `code`, `password`). Signs out other devices |
 | GET | `/api/events/` | List your events, plus shared events you've accepted |
 | GET | `/api/events/?start=...&end=...` | Only events that overlap that date range. Dates like `2026-11-01T00:00:00Z` or `2026-11-01`; a value that isn't a real date gives **400** naming it, e.g. `{"start": ["Enter a valid date and time, e.g. 2026-11-01T00:00:00Z."]}` |
+| GET | `/api/events/?tags=work,football` | Only my events with **any** of those tags (names tidied like when saved: `Work` = `work`). Combines with `start`/`end`. Unknown tags give `[]`; events shared with me are left out, since tags are private |
 | POST | `/api/events/` | Create an event. Optional `tags`: a list of your own labels, e.g. `["work", "football"]` (up to 20, each 1–30 characters, no commas; stored lowercase, no repeats) |
 | GET | `/api/events/{id}/` | Get one event. `tags` are your labels A–Z (always `[]` on an event someone shared with you: tags are private). `shares` lists each person it's shared with and their answer (`waiting`, `accepted`, `declined`); `my_status` is yours |
 | PUT / PATCH | `/api/events/{id}/` | Replace / change part of an event (owner only). Sending `tags` replaces them (`[]` clears them); leaving it out keeps them. People added to `shared_with` get an invite; people removed before answering are told it was cancelled |
