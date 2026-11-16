@@ -115,3 +115,55 @@ class EventTests(APITestCase):
         self.client.force_authenticate(user=ben)
         response = self.client.patch(f'/api/events/{event.id}/', {'shared_with': ['ben', 'cleo']}, format='json')
         self.assertEqual(response.status_code, 403)
+
+
+class EventDateFilterTests(APITestCase):
+    """GET /api/events/?start=&end= (CO/BE13): bad dates give a 400 that
+    names the parameter; good or missing dates work as before."""
+
+    def setUp(self):
+        self.user = User.objects.create_user('anna', password='pass12345')
+        self.client.force_authenticate(user=self.user)
+        Event.objects.create(title='October', owner=self.user,
+                             start='2026-10-10T09:00:00Z', end='2026-10-10T10:00:00Z')
+        Event.objects.create(title='November', owner=self.user,
+                             start='2026-11-10T09:00:00Z', end='2026-11-10T10:00:00Z')
+
+    def titles(self, response):
+        return sorted(event['title'] for event in response.data)
+
+    def test_bad_start_gives_400_naming_start(self):
+        response = self.client.get('/api/events/?start=banana')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('start', response.data)
+
+    def test_bad_end_gives_400_naming_end(self):
+        response = self.client.get('/api/events/?end=banana')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('end', response.data)
+
+    def test_impossible_date_gives_400(self):
+        response = self.client.get('/api/events/?start=2026-13-01')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('start', response.data)
+
+    def test_valid_range_returns_only_overlapping_events(self):
+        response = self.client.get('/api/events/?start=2026-11-01T00:00:00Z&end=2026-11-30T23:59:59Z')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.titles(response), ['November'])
+
+    def test_app_format_with_milliseconds_works(self):
+        # The app sends Date.toISOString(), e.g. 2026-11-01T00:00:00.000Z
+        response = self.client.get('/api/events/?start=2026-11-01T00:00:00.000Z&end=2026-11-30T23:59:59.999Z')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.titles(response), ['November'])
+
+    def test_date_only_works(self):
+        response = self.client.get('/api/events/?start=2026-11-01&end=2026-11-30')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.titles(response), ['November'])
+
+    def test_no_dates_returns_all_events(self):
+        response = self.client.get('/api/events/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.titles(response), ['November', 'October'])
