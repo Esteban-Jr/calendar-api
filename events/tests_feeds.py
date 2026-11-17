@@ -1,12 +1,18 @@
-"""Calendar links API (CO/BE18, part 2): add an .ics / webcal link, its
+"""Calendar links API (CO/BE18, parts 2 and 3): add an .ics / webcal link, its
 events show in my calendar, read-only. The link check, download and reader
 are tested on their own in tests_feeds_read.py; here the web is faked the
 same way."""
+from datetime import timedelta
+from io import StringIO
+
+import requests
 from django.contrib.auth.models import User
+from django.core.management import call_command
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from .models import Event, Feed
-from .tests_feeds_read import FakeResponse, FakeWebMixin
+from .tests_feeds_read import CHELSEA, FakeResponse, FakeWebMixin, calendar, vevent
 
 
 class FeedTestCase(FakeWebMixin, APITestCase):
@@ -146,6 +152,88 @@ class ImportedEventTests(FeedTestCase):
         self.client.force_authenticate(user=self.ben)
         self.assertEqual(self.client.get('/api/feeds/').data, [])
         self.assertEqual(self.client.get(f'/api/feeds/{self.feed_id}/').status_code, 404)
+        self.assertEqual(self.client.post(f'/api/feeds/{self.feed_id}/refresh/').status_code, 404)
         self.assertEqual(self.client.delete(f'/api/feeds/{self.feed_id}/').status_code, 404)
         self.assertEqual(self.titles(), [])
 
+class RefreshTests(FeedTestCase):
+    def setUp(self):
+        super().setUp()
+        self.feed_id = self.add().data['id']
+        self.make_stale()
+
+    def make_stale(self):
+        Feed.objects.update(last_fetched=timezone.now() - timedelta(hours=7))
+
+    def refresh(self):
+        return self.client.post(f'/api/feeds/{self.feed_id}/refresh/')
+
+    def test_refresh_changes_adds_and_removes_events(self):
+        self.serve(FakeResponse(calendar(
+            vevent('match-1', 'Chelsea v Arsenal', '20261120T180000Z', '20261120T200000Z'),  # moved
+            vevent('match-3', 'Chelsea v Spurs', '20261215T200000Z', '20261215T220000Z'),  # new
+            vevent('match-4', 'Everton v Chelsea', '20261219T150000Z', '20261219T170000Z'),  # new
+        )))  # match-2 is gone
+        response = self.refresh()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['event_count'], 3)
+        self.assertEqual(self.titles(), ['Chelsea v Arsenal', 'Chelsea v Spurs', 'Everton v Chelsea'])
+        self.assertEqual(Event.objects.get(feed_uid='match-1').start.isoformat(), '2026-11-20T18:00:00+00:00')
+
+    def test_refresh_keeps_the_same_event_ids(self):
+        before = Event.objects.get(feed_uid='match-1').id
+        self.serve(FakeResponse(CHELSEA))
+        self.refresh()
+        self.assertEqual(Event.objects.get(feed_uid='match-1').id, before)
+
+    def test_a_failed_refresh_gives_502_and_keeps_the_events(self):
+        self.serve(FakeResponse(status=500))
+        response = self.refresh()
+        self.assertEqual(response.status_code, 502)
+        self.assertIn('detail', response.data)
+        self.assertEqual(Event.objects.count(), 2)
+        self.assertNotEqual(Feed.objects.get().last_error, '')
+        # The next good refresh clears the error.
+        self.make_stale()
+        self.serve(FakeResponse(CHELSEA))
+        self.assertEqual(self.refresh().data['last_error'], '')
+
+    def test_refreshing_again_within_a_minute_gives_429(self):
+        self.serve(FakeResponse(CHELSEA), FakeResponse(CHELSEA))
+        self.assertEqual(self.refresh().status_code, 200)
+        self.assertEqual(self.refresh().status_code, 429)
+        self.assertEqual(self.get.call_count, 2)  # the add + one refresh
+
+
+
+class RefreshCommandTests(FeedTestCase):
+    """`manage.py refresh_feeds`, run every 6 hours by the server timer (PL/BE28)."""
+
+    def setUp(self):
+        super().setUp()
+        self.add(url='https://example.com/old.ics', name='Old')
+        self.add(url='https://example.com/fresh.ics', name='Fresh')
+        Feed.objects.filter(name='Old').update(last_fetched=timezone.now() - timedelta(hours=7))
+        self.get.reset_mock()
+
+    def run_command(self, *args):
+        out = StringIO()
+        call_command('refresh_feeds', *args, stdout=out, stderr=StringIO())
+        return out.getvalue()
+
+    def test_refreshes_only_links_older_than_6_hours(self):
+        output = self.run_command()
+        self.assertEqual(self.get.call_count, 1)
+        self.assertEqual(self.get.call_args.args[0], 'https://example.com/old.ics')
+        self.assertIn('1 refreshed, 0 failed', output)
+
+    def test_all_refreshes_every_link(self):
+        self.run_command('--all')
+        self.assertEqual(self.get.call_count, 2)
+
+    def test_one_broken_link_does_not_stop_the_others(self):
+        Feed.objects.update(last_fetched=timezone.now() - timedelta(hours=7))
+        self.serve(requests.Timeout(), FakeResponse(CHELSEA))
+        output = self.run_command()
+        self.assertIn('1 refreshed, 1 failed', output)
+        self.assertEqual(Feed.objects.exclude(last_error='').count(), 1)
