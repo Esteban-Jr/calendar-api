@@ -15,7 +15,7 @@ A REST API for personal calendars, built with Django REST Framework. Users keep 
 - Change your username once a week; friends are told "anna is now called annabel"
 - Share an event with your friends: they get an invite to accept or decline, and it only shows in their calendar once they accept. They can read it; only the owner can change or delete it
 - Reminders as push notifications, even when the app is closed (Web Push, sent by a job that runs every minute)
-- Calendar links: add an `.ics` / `webcal://` link (e.g. a club's fixtures) and its events show in your calendar, read-only
+- Calendar links: add an `.ics` / `webcal://` link (e.g. a club's fixtures) and its events show in your calendar, read-only, kept up to date by the server
 - Colombian public holidays, fetched from [Nager.Date](https://date.nager.at) and returned in this API's own format
 - Time zone aware: times are stored in UTC and shown in `America/Bogota`
 - Interactive API docs (Swagger UI) generated from the code
@@ -47,6 +47,7 @@ All endpoints except the login and the docs need the header `Authorization: Toke
 | POST | `/api/feeds/` | Add a calendar link (`name`, `url`, optional `color`). It's read straight away: a link that can't be read gives a 400 and isn't saved. Up to 10 |
 | PATCH | `/api/feeds/{id}/` | Rename or recolour a link (`name`, `color`); its events take the new colour. The link itself can't change |
 | DELETE | `/api/feeds/{id}/` | Remove a link and all its events |
+| POST | `/api/feeds/{id}/refresh/` | Read the link again now. 502 if the website fails (the events stay as they were); 429 if tried in the last minute |
 | GET | `/api/holidays/?year=2026` | Colombian public holidays for a year |
 | GET | `/api/me/` | Who am I: `id`, `username`, `email`, `theme`, and `next_username_change` (when I can change it again, or `null`) |
 | PATCH | `/api/me/` | Change my username (`username`): same rules as signing up, once a week. Friends and pending friend requests are told, unless only the capitals changed. Or change my calendar's look (`theme`: `default`, `faith`, `football`, `space`), any time |
@@ -100,8 +101,8 @@ All endpoints except the login and the docs need the header `Authorization: Toke
 | 401 | No token, or an invalid one |
 | 403 | You can see the event (it was shared with you) but you are not the owner, or it was imported from a calendar link |
 | 404 | The event does not exist, or it is not yours or shared with you |
-| 429 | Too many tries from one address (login, sign-up, emailed codes) |
-| 502 | The holidays service is down or returned an error |
+| 429 | Too many tries from one address (login, sign-up, emailed codes), or refreshing a calendar link twice within a minute |
+| 502 | The holidays service, or a calendar link's website, is down or returned an error |
 
 A stranger gets a 404 and not a 403 on purpose, so the API never confirms that someone else's event exists.
 
@@ -204,8 +205,9 @@ Settings come from environment variables. With none set, the app runs in develop
 ## Calendar links
 
 - Add a link to any calendar that offers one (`.ics`, or `webcal://`, which is fetched as `https://`). The server reads it with [icalendar](https://pypi.org/project/icalendar/) and saves its events as yours, marked `imported_from`.
-- Each event is matched by its `UID`, so its `id` stays the same when the link is read again.
+- Each event is matched by its `UID`, so refreshing updates moved events, adds new ones and removes cancelled ones, and their `id`s stay the same.
 - All-day events run from midnight to midnight in Bogota time. Events that ended over a year ago are skipped. Repeating events only bring their first date for now (#29).
+- `python manage.py refresh_feeds` re-reads links last read over 6 hours ago (`--all` for every link). One broken link doesn't stop the others; its error is saved in `last_error`. On the server a timer runs it (#28).
 - **Safety (SSRF):** the links come from users, so before every request (and every redirect, which are followed by hand, at most 3) the server checks the address is a normal public website: http/https on ports 80/443, no username or password, and every IP the name resolves to must be public (no localhost, private networks or cloud metadata). Requests time out after 10 seconds; files over 2 MB or with over 2,000 events are refused.
 
 ## Design notes
