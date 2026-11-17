@@ -6,6 +6,7 @@ from notifications.notify import notify
 from . import feeds
 from .models import Event, Feed, Share
 from .serializers import EventSerializer, FeedSerializer, InviteAgainSerializer
+from datetime import timedelta
 from django.db import transaction
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
@@ -178,6 +179,7 @@ class FeedViewSet(viewsets.ModelViewSet):
     serializer_class = FeedSerializer
     permission_classes = [permissions.IsAuthenticated]
     http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
+    REFRESH_GAP = timedelta(seconds=60)
 
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):  # building the API docs
@@ -199,3 +201,17 @@ class FeedViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         feed = serializer.save()
         feed.events.update(color=feed.color)
+
+    @extend_schema(request=None, responses={200: FeedSerializer})
+    @action(detail=True, methods=['post'])
+    def refresh(self, request, pk=None):
+        """Read the link again now. 502 if the website fails (the events stay
+        as they were); 429 if it was tried less than a minute ago."""
+        feed = self.get_object()
+        if feed.last_fetched and timezone.now() - feed.last_fetched < self.REFRESH_GAP:
+            return Response({'detail': 'This link was refreshed less than a minute ago. Try again soon.'}, status=429)
+        try:
+            feeds.refresh(feed)
+        except feeds.FeedError as error:
+            return Response({'detail': str(error)}, status=502)
+        return Response(self.get_serializer(self.get_queryset().get(pk=feed.pk)).data)  # fresh event_count

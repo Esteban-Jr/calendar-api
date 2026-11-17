@@ -1,5 +1,5 @@
 """Reading calendar links (.ics / webcal) for CO/BE18. import_events saves
-them as the link's events.
+them as the link's events; refresh does both.
 
 The links come from users, so the server must only ever visit normal public
 websites (no localhost, no private network, no cloud metadata address). That
@@ -145,3 +145,20 @@ def import_events(feed, events):
             event.color = feed.color
             event.save()
         Event.objects.filter(pk__in=[event.pk for event in saved.values()]).delete()
+
+
+def refresh(feed):
+    """Read the feed's link and update its events. On failure the error is
+    saved on the feed, its events are left alone, and FeedError is raised.
+    last_fetched is when we last tried, so a broken site isn't hammered."""
+    try:
+        events = read(fetch(feed.url))
+    except FeedError as error:
+        feed.last_fetched = timezone.now()
+        feed.last_error = str(error)[:200]
+        feed.save(update_fields=['last_fetched', 'last_error'])
+        raise
+    import_events(feed, events)
+    feed.last_fetched = timezone.now()
+    feed.last_error = ''
+    feed.save(update_fields=['last_fetched', 'last_error'])
