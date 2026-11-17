@@ -3,14 +3,17 @@ from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from notifications.models import Notification
 from notifications.notify import notify
-from .models import Event, Share
-from .serializers import EventSerializer, InviteAgainSerializer
-from django.db.models import Q
+from . import feeds
+from .models import Event, Feed, Share
+from .serializers import EventSerializer, FeedSerializer, InviteAgainSerializer
+from django.db import transaction
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from .permissions import IsOwnerOrReadOnly
 import requests
 from rest_framework.decorators import api_view
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 class EventViewSet(viewsets.ModelViewSet):
@@ -26,7 +29,7 @@ class EventViewSet(viewsets.ModelViewSet):
         qs = (
             Event.objects.filter(Q(owner=me) | Q(shares__user=me, shares__status__in=answers))
             .distinct()
-            .select_related('owner')
+            .select_related('owner', 'feed')
             .prefetch_related('shares__user')
         )
         start = self.request.query_params.get('start')
@@ -166,3 +169,33 @@ def holidays(request):
         for h in r.json()
     ]
     return Response(result)
+
+
+class FeedViewSet(viewsets.ModelViewSet):
+    """My calendar links (CO/BE18). Adding one reads it straight away and its
+    events show in my calendar, read-only. Deleting it removes them."""
+
+    serializer_class = FeedSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
+
+    def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):  # building the API docs
+            return Feed.objects.none()
+        return Feed.objects.filter(owner=self.request.user).annotate(event_count=Count('events')).order_by('name', 'id')
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            events = feeds.read(feeds.fetch(serializer.validated_data['url']))
+        except feeds.FeedError as error:
+            raise ValidationError({'url': [str(error)]})
+        with transaction.atomic():
+            feed = serializer.save(owner=request.user, last_fetched=timezone.now())
+            feeds.import_events(feed, events)
+        return Response(self.get_serializer(feed).data, status=201)
+
+    def perform_update(self, serializer):
+        feed = serializer.save()
+        feed.events.update(color=feed.color)
