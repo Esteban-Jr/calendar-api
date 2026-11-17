@@ -1,5 +1,5 @@
-"""Reading calendar links (.ics / webcal) for CO/BE18. Saving their events
-is in part 2 (the API).
+"""Reading calendar links (.ics / webcal) for CO/BE18. import_events saves
+them as the link's events.
 
 The links come from users, so the server must only ever visit normal public
 websites (no localhost, no private network, no cloud metadata address). That
@@ -16,9 +16,11 @@ from datetime import datetime, time, timedelta
 from urllib.parse import urljoin, urlsplit
 
 import requests
+from django.db import transaction
 from django.utils import timezone
 from icalendar import Calendar
 
+from .models import Event
 
 TIMEOUT = 10  # seconds
 MAX_BYTES = 2 * 1024 * 1024
@@ -131,3 +133,15 @@ def read(data):
             raise FeedError(f'That calendar has more than {MAX_EVENTS} events.')
     return events
 
+
+def import_events(feed, events):
+    """Make the feed's saved events match `events` (by UID): add, update, remove."""
+    with transaction.atomic():
+        saved = {event.feed_uid: event for event in feed.events.all()}
+        for uid, fields in events.items():
+            event = saved.pop(uid, None) or Event(feed=feed, feed_uid=uid, owner=feed.owner)
+            for name, value in fields.items():
+                setattr(event, name, value)
+            event.color = feed.color
+            event.save()
+        Event.objects.filter(pk__in=[event.pk for event in saved.values()]).delete()

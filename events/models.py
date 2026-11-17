@@ -13,6 +13,25 @@ EVENT_COLORS = [
     ('bubblegum', 'Bubblegum'),
 ]
 
+class Feed(models.Model):
+    """A calendar link someone subscribed to (e.g. all of a club's games).
+    The server reads it (see events/feeds.py) and keeps its events in step."""
+
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='feeds')
+    name = models.CharField(max_length=50)
+    url = models.URLField(max_length=500)
+    color = models.CharField(max_length=20, choices=EVENT_COLORS, default='blueberry')
+    last_fetched = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=200, blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['owner', 'url'], name='one_feed_per_link')]
+
+    def __str__(self):
+        return f'{self.name} ({self.owner.username})'
+
+
 class Event(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
@@ -28,6 +47,17 @@ class Event(models.Model):
     # The start time a push reminder was last sent for (see push/). If the
     # event is moved, start no longer matches and the reminder goes out again.
     reminder_sent_for = models.DateTimeField(null=True, blank=True, editable=False)
+    # Set on events imported from a calendar link. They're read-only: the
+    # link is the source, and refreshing it adds, changes or removes them.
+    feed = models.ForeignKey(Feed, null=True, blank=True, on_delete=models.CASCADE, related_name='events')
+    feed_uid = models.CharField(max_length=255, blank=True, editable=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['feed', 'feed_uid'], condition=models.Q(feed__isnull=False), name='one_event_per_feed_uid',
+            ),
+        ]
 
 
 class Share(models.Model):

@@ -11,5 +11,11 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:
             return True
 
+        # Events imported from a calendar link can't be changed here: the
+        # link is the source (CO/BE18).
+        if getattr(obj, 'feed_id', None):
+            self.message = 'Imported from a calendar link; change it at the source.'
+            return False
+
         # Write permissions are only allowed to the owner of the event.
         return obj.owner == request.user
