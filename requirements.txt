@@ -13,6 +13,7 @@ drf-spectacular==0.30.0
 frozenlist==1.8.0
 gunicorn==26.2.0
 http_ece==1.2.1
+icalendar==7.3.0
 idna==3.20
 inflection==0.5.1
 jsonschema==4.26.0
@@ -23,6 +24,7 @@ psycopg==3.3.6
 psycopg-binary==3.3.6
 py-vapid==1.9.6
 pycparser==3.12
+python-dateutil==4.0.0
 pywebpush==2.5.0
 PyYAML==6.0.3
 referencing==0.37.0
@@ -30,6 +32,7 @@ requests==2.34.2
 rpds-py==2026.9.1
 sqlparse==0.6.0
 typing_extensions==4.16.0
+tzdata==2026.6
 uritemplate==4.2.0
 urllib3==2.8.0
 whitenoise==6.12.0
