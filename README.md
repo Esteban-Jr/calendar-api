@@ -15,6 +15,7 @@ A REST API for personal calendars, built with Django REST Framework. Users keep 
 - Change your username once a week; friends are told "anna is now called annabel"
 - Share an event with your friends: they get an invite to accept or decline, and it only shows in their calendar once they accept. They can read it; only the owner can change or delete it
 - Reminders as push notifications, even when the app is closed (Web Push, sent by a job that runs every minute)
+- A daily Bible verse (NTV) for the Faith theme, from [Bible Gateway](https://www.biblegateway.com)'s verse of the day, fetched once a day
 - Colombian public holidays, fetched from [Nager.Date](https://date.nager.at) and returned in this API's own format
 - Time zone aware: times are stored in UTC and shown in `America/Bogota`
 - Interactive API docs (Swagger UI) generated from the code
@@ -43,6 +44,7 @@ All endpoints except the login and the docs need the header `Authorization: Toke
 | POST | `/api/events/{id}/decline/` | Decline an invite: it never shows in my calendar. The owner is notified |
 | POST | `/api/events/{id}/invite-again/` | Owner only: send a fresh invite to someone who declined (`username`) |
 | GET | `/api/holidays/?year=2026` | Colombian public holidays for a year |
+| GET | `/api/verse/` | Today's Bible verse (NTV) from Bible Gateway: `date`, `text`, `reference`, `version`, `version_name`, `link`, `copyright_link`, `stale` (true if Bible Gateway is down and this is the last verse we had). Same for everyone |
 | GET | `/api/me/` | Who am I: `id`, `username`, `email`, `theme`, and `next_username_change` (when I can change it again, or `null`) |
 | PATCH | `/api/me/` | Change my username (`username`): same rules as signing up, once a week. Friends and pending friend requests are told, unless only the capitals changed. Or change my calendar's look (`theme`: `default`, `faith`, `football`, `space`), any time |
 | GET | `/api/friends/` | My friends, requests sent to me (`incoming`) and requests I sent (`outgoing`) |
@@ -94,7 +96,7 @@ All endpoints except the login and the docs need the header `Authorization: Toke
 | 403 | You can see the event (it was shared with you) but you are not the owner |
 | 404 | The event does not exist, or it is not yours or shared with you |
 | 429 | Too many tries from one address (login, sign-up, emailed codes) |
-| 502 | The holidays service is down or returned an error |
+| 502 | The holidays service is down or returned an error, or the verse service is down and no verse has been saved yet |
 
 A stranger gets a 404 and not a 403 on purpose, so the API never confirms that someone else's event exists.
 
@@ -193,6 +195,12 @@ Settings come from environment variables. With none set, the app runs in develop
 - Each reminder is sent once per start time: `Event.reminder_sent_for` remembers it, so moving an event reminds again.
 - The message uses the same wording and the same notification tag as the web app's own reminders, so a phone with the app open shows one notification, not two.
 - Devices the push service reports as gone (404/410) are deleted. Only real push service addresses are accepted, so the server can't be made to send requests anywhere else.
+
+## Daily verse
+
+- `GET /api/verse/` asks Bible Gateway's free verse of the day (`/votd/get/?format=json&version=NTV`) **at most once a day** (Bogota date), saves it and serves that copy to everyone.
+- Only the latest verse is kept: it's a cache of Bible Gateway's public verse, not a copy of the Bible. Clients must show the `reference`, the `link` to the passage and the `copyright_link`.
+- If Bible Gateway is down or sends something unusable, the last verse is returned with `stale: true` (or a 502 if there's none), and Bible Gateway isn't asked again for 10 minutes.
 
 ## Design notes
 
