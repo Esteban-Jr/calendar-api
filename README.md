@@ -75,7 +75,10 @@ All endpoints except the login and the docs need the header `Authorization: Toke
   "owner_username": "anna",
   "reminder": 30,
   "color": "blueberry",
-  "shared_with": ["ben"]
+  "shared_with": ["ben"],
+  "tags": ["football"],
+  "repeat": "weekly",
+  "repeat_until": "2026-12-31"
 }
 ```
 
@@ -84,6 +87,7 @@ All endpoints except the login and the docs need the header `Authorization: Toke
 - `color` is one of `strawberry`, `peach`, `vanilla`, `pistachio`, `mint`, `blueberry` (default), `lavender`, `bubblegum`.
 - `reminder` is minutes before the start, from 0 to 10080 (one week).
 - A time sent without an offset is read as Bogota time.
+- `repeat` is `none` (default), `daily`, `weekly`, `monthly` or `yearly`. `repeat_until` is an optional last date for the repeats (inclusive; empty = forever). It must be on or after the start date, needs a `repeat`, and the event must be shorter than its repeat (under 1 day for daily, 7 for weekly, 28 for monthly, 365 for yearly), otherwise 400. Editing the event changes the whole series. *For now the list still shows each repeating event once; each repeat appears with #25.*
 
 ### Status codes
 

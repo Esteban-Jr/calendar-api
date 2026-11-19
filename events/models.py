@@ -13,6 +13,16 @@ EVENT_COLORS = [
     ('bubblegum', 'Bubblegum'),
 ]
 
+# How an event can repeat. "none" is a normal one-off event.
+REPEATS = [
+    ('none', "Doesn't repeat"),
+    ('daily', 'Every day'),
+    ('weekly', 'Every week'),
+    ('monthly', 'Every month'),
+    ('yearly', 'Every year'),
+]
+
+
 class Tag(models.Model):
     """A short label someone puts on their own events ("work", "football").
     Each person has their own tags: anna's "work" and ben's "work" are two
@@ -42,6 +52,10 @@ class Event(models.Model):
     shared_with = models.ManyToManyField(User, through='Share', related_name='shared_events', blank=True)
     # The owner's own labels for this event. Friends it's shared with don't see them.
     tags = models.ManyToManyField(Tag, related_name='events', blank=True)
+    # The repeat rule: how often, and the last day it can repeat on (empty =
+    # forever). Editing the event changes the whole series.
+    repeat = models.CharField(max_length=10, choices=REPEATS, default='none')
+    repeat_until = models.DateField(null=True, blank=True)
     # The start time a push reminder was last sent for (see push/). If the
     # event is moved, start no longer matches and the reminder goes out again.
     reminder_sent_for = models.DateTimeField(null=True, blank=True, editable=False)

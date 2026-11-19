@@ -1,4 +1,7 @@
 from django.contrib.auth.models import User
+from datetime import timedelta
+
+from django.utils import timezone
 from rest_framework import serializers
 from friends.models import friends_of
 from .models import Event, Share, Tag
@@ -26,7 +29,7 @@ class EventSerializer(serializers.ModelSerializer):
         model = Event
         fields = [
             'id', 'title', 'description', 'location', 'start', 'end', 'owner', 'owner_username', 'reminder', 'color',
-            'shared_with', 'shares', 'my_status', 'tags',
+            'shared_with', 'shares', 'my_status', 'tags', 'repeat', 'repeat_until',
         ]
         read_only_fields = ['id', 'owner']
     
@@ -101,7 +104,36 @@ class EventSerializer(serializers.ModelSerializer):
         end = data.get('end', self.instance.end if self.instance else None)
         if start and end and end <= start:
             raise serializers.ValidationError("End must be after start.")
+        self._check_repeat(data, start, end)
         return data
+
+    # The longest an event can last for each repeat, so a repeat never runs
+    # into the next one (a month and a year use their shortest length).
+    REPEAT_GAPS = {
+        'daily': timedelta(days=1),
+        'weekly': timedelta(days=7),
+        'monthly': timedelta(days=28),
+        'yearly': timedelta(days=365),
+    }
+
+    def _check_repeat(self, data, start, end):
+        # Look at the rule as it will be after this change (PATCH sends only part).
+        def now_or_before(field, default):
+            return data[field] if field in data else getattr(self.instance, field, default)
+
+        repeat = now_or_before('repeat', 'none')
+        until = now_or_before('repeat_until', None)
+        if until and repeat == 'none':
+            raise serializers.ValidationError(
+                {'repeat_until': ["Only a repeating event can have an end date for its repeats."]}
+            )
+        if until and start and until < timezone.localtime(start).date():
+            raise serializers.ValidationError({'repeat_until': ["Can't be before the event's start date."]})
+        gap = self.REPEAT_GAPS.get(repeat)
+        if gap and start and end and end - start >= gap:
+            raise serializers.ValidationError(
+                {'repeat': [f"The event is too long to repeat {repeat} (it would overlap the next one)."]}
+            )
 
 
 class InviteAgainSerializer(serializers.Serializer):
