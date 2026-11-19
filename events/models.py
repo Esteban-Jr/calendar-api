@@ -13,6 +13,21 @@ EVENT_COLORS = [
     ('bubblegum', 'Bubblegum'),
 ]
 
+class Tag(models.Model):
+    """A short label someone puts on their own events ("work", "football").
+    Each person has their own tags: anna's "work" and ben's "work" are two
+    different rows. Names are stored tidied (trimmed, lowercase)."""
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tags')
+    name = models.CharField(max_length=30)
+
+    class Meta:
+        ordering = ['name']
+        constraints = [models.UniqueConstraint(fields=['owner', 'name'], name='unique_tag_per_owner')]
+
+    def __str__(self):
+        return f'{self.owner.username}: {self.name}'
+
+
 class Event(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
@@ -25,6 +40,8 @@ class Event(models.Model):
     # Who it's shared with. Each person has a Share saying whether they've
     # accepted, declined, or not answered the invite yet.
     shared_with = models.ManyToManyField(User, through='Share', related_name='shared_events', blank=True)
+    # The owner's own labels for this event. Friends it's shared with don't see them.
+    tags = models.ManyToManyField(Tag, related_name='events', blank=True)
     # The start time a push reminder was last sent for (see push/). If the
     # event is moved, start no longer matches and the reminder goes out again.
     reminder_sent_for = models.DateTimeField(null=True, blank=True, editable=False)

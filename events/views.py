@@ -6,14 +6,14 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import action
 from notifications.models import Notification
 from notifications.notify import notify
-from .models import Event, Share
+from .models import Event, Share, Tag
 from .serializers import EventSerializer, InviteAgainSerializer
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from .permissions import IsOwnerOrReadOnly
 import requests
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
 def _date_param(request, name):
@@ -44,7 +44,7 @@ class EventViewSet(viewsets.ModelViewSet):
             Event.objects.filter(Q(owner=me) | Q(shares__user=me, shares__status__in=answers))
             .distinct()
             .select_related('owner')
-            .prefetch_related('shares__user')
+            .prefetch_related('shares__user', 'tags')
         )
         start = _date_param(self.request, 'start')
         end = _date_param(self.request, 'end')
@@ -183,3 +183,16 @@ def holidays(request):
         for h in r.json()
     ]
     return Response(result)
+
+
+@extend_schema(responses={200: {'type': 'array', 'items': {'type': 'string'}}})
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def tags(request):
+    """My tags that are on at least one of my events, A-Z. Unused tags drop
+    off by themselves, so there's nothing to tidy up."""
+    names = (
+        Tag.objects.filter(owner=request.user, events__isnull=False)
+        .values_list('name', flat=True).distinct().order_by('name')
+    )
+    return Response(list(names))
