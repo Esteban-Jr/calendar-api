@@ -1,5 +1,8 @@
 from drf_spectacular.utils import extend_schema
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db.models import DateTimeField
 from rest_framework import viewsets, permissions
+from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import action
 from notifications.models import Notification
 from notifications.notify import notify
@@ -12,6 +15,20 @@ from .permissions import IsOwnerOrReadOnly
 import requests
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+
+def _date_param(request, name):
+    """Read the ?start= / ?end= date filter. Django's own date-time parser is
+    used (the same one the filter used before), so every format that worked
+    still works. A value that isn't a real date gives a 400 naming `name`,
+    instead of crashing with a 500. Missing or empty means no filter."""
+    value = request.query_params.get(name)
+    if not value:
+        return None
+    try:
+        return DateTimeField().to_python(value)
+    except DjangoValidationError:
+        raise ValidationError({name: ['Enter a valid date and time, e.g. 2026-11-01T00:00:00Z.']})
+
 
 class EventViewSet(viewsets.ModelViewSet):
     serializer_class = EventSerializer
@@ -29,8 +46,8 @@ class EventViewSet(viewsets.ModelViewSet):
             .select_related('owner')
             .prefetch_related('shares__user')
         )
-        start = self.request.query_params.get('start')
-        end = self.request.query_params.get('end')
+        start = _date_param(self.request, 'start')
+        end = _date_param(self.request, 'end')
         if start:
             qs = qs.filter(end__gte=start)
         if end:
