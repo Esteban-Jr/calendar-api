@@ -55,6 +55,13 @@ class EventTagTests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn('tags', response.data)
 
+    def test_tag_with_a_comma_gives_400(self):
+        # ?tags= splits on commas, so a tag like "rock,pop" could never be found.
+        response = self.create(tags=['rock,pop'])
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('tags', response.data)
+        self.assertEqual(Tag.objects.count(), 0)
+
     def test_more_than_20_tags_gives_400(self):
         response = self.create(tags=[f'tag{n}' for n in range(21)])
         self.assertEqual(response.status_code, 400)

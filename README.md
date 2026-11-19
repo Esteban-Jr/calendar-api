@@ -35,7 +35,7 @@ All endpoints except the login and the docs need the header `Authorization: Toke
 | POST | `/api/auth/reset/` | Choose a new password (`email`, `code`, `password`). Signs out other devices |
 | GET | `/api/events/` | List your events, plus shared events you've accepted |
 | GET | `/api/events/?start=...&end=...` | Only events that overlap that date range. Dates like `2026-11-01T00:00:00Z` or `2026-11-01`; a value that isn't a real date gives **400** naming it, e.g. `{"start": ["Enter a valid date and time, e.g. 2026-11-01T00:00:00Z."]}` |
-| POST | `/api/events/` | Create an event. Optional `tags`: a list of your own labels, e.g. `["work", "football"]` (up to 20, each 1–30 characters; stored lowercase, no repeats) |
+| POST | `/api/events/` | Create an event. Optional `tags`: a list of your own labels, e.g. `["work", "football"]` (up to 20, each 1–30 characters, no commas; stored lowercase, no repeats) |
 | GET | `/api/events/{id}/` | Get one event. `tags` are your labels A–Z (always `[]` on an event someone shared with you: tags are private). `shares` lists each person it's shared with and their answer (`waiting`, `accepted`, `declined`); `my_status` is yours |
 | PUT / PATCH | `/api/events/{id}/` | Replace / change part of an event (owner only). Sending `tags` replaces them (`[]` clears them); leaving it out keeps them. People added to `shared_with` get an invite; people removed before answering are told it was cancelled |
 | DELETE | `/api/events/{id}/` | Delete an event (owner only). People who accepted are told it was deleted, people who hadn't answered that it was cancelled |

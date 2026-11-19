@@ -60,6 +60,10 @@ class EventSerializer(serializers.ModelSerializer):
         return users
 
     def validate_tags(self, names):
+        # No commas: ?tags=work,football splits on them, so "rock,pop" could
+        # never be found (CO/BE16).
+        if any(',' in name for name in names):
+            raise serializers.ValidationError("Tag names can't contain commas.")
         # Tidy: lowercase, and the same tag only once ("Work" and "work" are one).
         return sorted({name.lower() for name in names})
 
