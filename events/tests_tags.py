@@ -116,3 +116,65 @@ class TagListTests(APITestCase):
         response = self.client.get('/api/tags/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data, ['football', 'work'])
+
+
+class TagFilterTests(APITestCase):
+    """GET /api/events/?tags=work,football (CO/BE16): only my events with any
+    of those tags. Works with ?start=/?end=; unknown tags give []."""
+
+    def setUp(self):
+        self.anna = User.objects.create_user('anna', password='pass12345')
+        self.ben = User.objects.create_user('ben', password='pass12345')
+        self.work = self.event(self.anna, 'Standup', '2026-11-10', 'work')
+        self.match = self.event(self.anna, 'Match', '2026-11-20', 'football')
+        self.both = self.event(self.anna, 'Work 5-a-side', '2026-12-05', 'work', 'football')
+        self.plain = self.event(self.anna, 'Dentist', '2026-11-15')
+        self.client.force_authenticate(user=self.anna)
+
+    def event(self, owner, title, day, *names):
+        event = Event.objects.create(
+            title=title, start=f'{day}T09:00:00Z', end=f'{day}T10:00:00Z', owner=owner,
+        )
+        for name in names:
+            event.tags.add(Tag.objects.get_or_create(owner=owner, name=name)[0])
+        return event
+
+    def titles(self, url):
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        return sorted(event['title'] for event in response.data)
+
+    def test_one_tag(self):
+        self.assertEqual(self.titles('/api/events/?tags=work'), ['Standup', 'Work 5-a-side'])
+
+    def test_two_tags_means_any_of_them_each_event_once(self):
+        self.assertEqual(
+            self.titles('/api/events/?tags=work,football'), ['Match', 'Standup', 'Work 5-a-side'],
+        )
+
+    def test_works_with_start_and_end(self):
+        url = '/api/events/?tags=work,football&start=2026-11-01T00:00:00Z&end=2026-11-30T23:59:59Z'
+        self.assertEqual(self.titles(url), ['Match', 'Standup'])
+
+    def test_unknown_tag_gives_empty_list(self):
+        self.assertEqual(self.titles('/api/events/?tags=nope'), [])
+
+    def test_empty_or_missing_tags_means_no_filter(self):
+        everything = ['Dentist', 'Match', 'Standup', 'Work 5-a-side']
+        self.assertEqual(self.titles('/api/events/'), everything)
+        self.assertEqual(self.titles('/api/events/?tags='), everything)
+        self.assertEqual(self.titles('/api/events/?tags=,,'), everything)
+
+    def test_tags_are_tidied_like_when_saved(self):
+        self.assertEqual(self.titles('/api/events/?tags=%20Work%20,'), ['Standup', 'Work 5-a-side'])
+
+    def test_a_friends_shared_event_is_not_returned_when_filtering(self):
+        shared = self.event(self.ben, "Ben's match", '2026-11-21', 'football')
+        Share.objects.create(event=shared, user=self.anna, status=Share.ACCEPTED)
+        self.assertIn("Ben's match", self.titles('/api/events/'))
+        self.assertNotIn("Ben's match", self.titles('/api/events/?tags=football'))
+
+    def test_someone_elses_same_named_tag_does_not_leak_in(self):
+        self.event(self.ben, "Ben's work", '2026-11-12', 'work')
+        self.client.force_authenticate(user=self.ben)
+        self.assertEqual(self.titles('/api/events/?tags=work'), ["Ben's work"])

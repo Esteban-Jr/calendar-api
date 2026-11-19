@@ -1,4 +1,4 @@
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import DateTimeField
 from rest_framework import viewsets, permissions
@@ -30,6 +30,18 @@ def _date_param(request, name):
         raise ValidationError({name: ['Enter a valid date and time, e.g. 2026-11-01T00:00:00Z.']})
 
 
+def _tags_param(request):
+    """The ?tags=work,football filter as tidy names (trimmed, lowercase, no
+    blanks or repeats), the same way tags are saved. Empty means no filter."""
+    value = request.query_params.get('tags', '')
+    return sorted({name.strip().lower() for name in value.split(',') if name.strip()})
+
+
+@extend_schema_view(list=extend_schema(parameters=[
+    OpenApiParameter('start', str, description='Only events ending on or after this date/time, e.g. 2026-11-01T00:00:00Z'),
+    OpenApiParameter('end', str, description='Only events starting on or before this date/time'),
+    OpenApiParameter('tags', str, description='Comma-separated tag names, e.g. work,football: only my events with any of them'),
+]))
 class EventViewSet(viewsets.ModelViewSet):
     serializer_class = EventSerializer
     permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
@@ -52,6 +64,10 @@ class EventViewSet(viewsets.ModelViewSet):
             qs = qs.filter(end__gte=start)
         if end:
             qs = qs.filter(start__lte=end)
+        # Only my own tags count: a friend's shared event never carries them.
+        names = _tags_param(self.request)
+        if names:
+            qs = qs.filter(tags__owner=me, tags__name__in=names)
         return qs
 
     def perform_create(self, serializer):
