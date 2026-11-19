@@ -200,6 +200,7 @@ Settings come from environment variables. With none set, the app runs in develop
 - **Friends:** one row per pair (`from_user` → `to_user`, `accepted`), with database rules against duplicates and against friending yourself. Sending requests is rate-limited (60 an hour) so usernames can't be guessed in bulk.
 - **Validation:** the serializer checks that `end` is after `start`, and on a `PATCH` it falls back to the saved values for any date that was not sent.
 - **Integration:** the holidays endpoint validates the year before using it, times out after 5 seconds, and turns any failure of the outside service into a 502, since that is not the client's fault.
+- **No caching:** every `/api/` and `/api-auth/` answer has `Cache-Control: no-store` (`config/middleware.py`), so phones and proxies never show an old copy, e.g. a bell still offering Accept / Decline after you accepted. Static files (`/static/`) keep their normal caching.
 
 ## Built with
 
