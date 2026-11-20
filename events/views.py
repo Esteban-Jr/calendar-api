@@ -1,6 +1,8 @@
 from drf_spectacular.utils import extend_schema
 from django.core.exceptions import ValidationError as DjangoValidationError
+from datetime import datetime, time
 from django.db.models import DateTimeField
+from django.utils.dateparse import parse_date
 from rest_framework import viewsets, permissions
 from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import action
@@ -16,14 +18,24 @@ import requests
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-def _date_param(request, name):
+def _date_param(request, name, end_of_day=False):
     """Read the ?start= / ?end= date filter. Django's own date-time parser is
     used (the same one the filter used before), so every format that worked
     still works. A value that isn't a real date gives a 400 naming `name`,
-    instead of crashing with a 500. Missing or empty means no filter."""
+    instead of crashing with a 500. Missing or empty means no filter.
+
+    A bare date (2026-11-30) is a whole day in the server's time (Bogota):
+    with `end_of_day` it means the last moment of that day, so "until the
+    30th" includes the 30th; otherwise it means midnight at its start."""
     value = request.query_params.get(name)
     if not value:
         return None
+    try:
+        day = parse_date(value)
+    except ValueError:
+        day = None  # Looks like a date but isn't one (2026-13-01): the 400 below.
+    if day:
+        return timezone.make_aware(datetime.combine(day, time.max if end_of_day else time.min))
     try:
         return DateTimeField().to_python(value)
     except DjangoValidationError:
@@ -47,7 +59,7 @@ class EventViewSet(viewsets.ModelViewSet):
             .prefetch_related('shares__user')
         )
         start = _date_param(self.request, 'start')
-        end = _date_param(self.request, 'end')
+        end = _date_param(self.request, 'end', end_of_day=True)
         if start:
             qs = qs.filter(end__gte=start)
         if end:
