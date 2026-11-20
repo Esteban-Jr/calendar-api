@@ -33,7 +33,7 @@ All endpoints except the login and the docs need the header `Authorization: Toke
 | POST | `/api/auth/forgot/` | Email a password-reset code (`email`). Same answer whether or not the account exists |
 | POST | `/api/auth/reset/` | Choose a new password (`email`, `code`, `password`). Signs out other devices |
 | GET | `/api/events/` | List your events, plus shared events you've accepted |
-| GET | `/api/events/?start=...&end=...` | Only events that overlap that date range. Dates like `2026-11-01T00:00:00Z` or `2026-11-01`; a value that isn't a real date gives **400** naming it, e.g. `{"start": ["Enter a valid date and time, e.g. 2026-11-01T00:00:00Z."]}` |
+| GET | `/api/events/?start=...&end=...` | Only events that overlap that date range. Dates like `2026-11-01T00:00:00Z` or `2026-11-01`. A bare date is a whole day in Bogota time: `start=2026-11-01` begins at midnight, and `end=2026-11-30` includes all of the 30th. A value that isn't a real date gives **400** naming it, e.g. `{"start": ["Enter a valid date and time, e.g. 2026-11-01T00:00:00Z."]}` |
 | POST | `/api/events/` | Create an event |
 | GET | `/api/events/{id}/` | Get one event. `shares` lists each person it's shared with and their answer (`waiting`, `accepted`, `declined`); `my_status` is yours |
 | PUT / PATCH | `/api/events/{id}/` | Replace / change part of an event (owner only). People added to `shared_with` get an invite; people removed before answering are told it was cancelled |
